@@ -20,26 +20,39 @@
 #include <string>
 #include <iostream>
 
+osg::ref_ptr<osg::Group> root = new osg::Group;
+
+osg::Vec3 trip_p0 (-150, 0, -2);
+osg::Vec3 trip_p1 (150, 0, -2);
 
 class MyReadCallback : public osg::NodeCallback {
   
-  virtual void operator()(osg::Node* temp, osg::NodeVisitor* nv) {
-    //std::cout << "fuckfuck" << std::endl;
+  public:
+    virtual void operator()(osg::Node* temp, osg::NodeVisitor* nv) {
 
-    if (intersector_->containsIntersections()) {
-        std::cout << intersector_->getFirstIntersection().getWorldIntersectPoint().x() << std::endl;
-        std::cout << intersector_->getFirstIntersection().getWorldIntersectPoint().y() << std::endl;
-        std::cout << intersector_->getFirstIntersection().getWorldIntersectPoint().z() << std::endl;
+      //std::cout << "fuckfuck" << std::endl;
+      osg::ref_ptr<osgUtil::LineSegmentIntersector> intersector = new osgUtil::LineSegmentIntersector(trip_p0, trip_p1);
+      //intersectorGroup->addIntersector(intersector.get());
 
-    }
-    /*if (intersector_->intersects(lodNode_.get()->getBound()))
-      std::cout << "hejsomfan" << std::endl;*/
+      osgUtil::IntersectionVisitor intersectVisitor( intersector.get());
+      root->accept(intersectVisitor);
+
+      if (intersector->containsIntersections()) {
+          std::cout << intersector->getFirstIntersection().getWorldIntersectPoint().x() << std::endl;
+          std::cout << intersector->getFirstIntersection().getWorldIntersectPoint().y() << std::endl;
+          std::cout << intersector->getFirstIntersection().getWorldIntersectPoint().z() << std::endl;
+
+         // std::cout <<"size"  intersector_->getIntersetions().size() << std::endl;
+
+      }
       
-  }
+      traverse(temp, nv); 
+        
+    }
 
-  public: 
-    osg::ref_ptr<osgUtil::LineSegmentIntersector> intersector_;
-    osg::ref_ptr<osg::LOD> lodNode_;
+   
+    //osg::ref_ptr<osgUtil::LineSegmentIntersector> intersector_;
+    //osg::ref_ptr<osg::LOD> lodNode_;
 
 };
 
@@ -130,7 +143,7 @@ void createGround(osg::ref_ptr<osg::Geode> tempGeode, int tempSize) {
   tempGeode->getOrCreateStateSet()->setTextureAttributeAndModes(0, groundTexture);
 }
 
-osg::ref_ptr<osg::MatrixTransform> createCessnaXform(osg::ref_ptr<osg::LOD> tempLod, osg::ref_ptr<osg::Node> tempCessnaNode, osg::AnimationPath* tempAnimationPath, float radius) {
+osg::ref_ptr<osg::MatrixTransform> createCessnaXform(osg::ref_ptr<osg::Node> tempCessnaNode, osg::AnimationPath* tempAnimationPath, float radius) {
   
   //Create simplified versions of cessna
   osg::ref_ptr<osg::MatrixTransform> cessnaXform;
@@ -138,20 +151,22 @@ osg::ref_ptr<osg::MatrixTransform> createCessnaXform(osg::ref_ptr<osg::LOD> temp
   if (tempCessnaNode) {
          const osg::BoundingSphere& bs = tempCessnaNode->getBound();
  
-         float size = radius/bs.radius()*0.3f*10.0f;
+         float size = radius/bs.radius()*0.3f;
          osg::MatrixTransform* positioned = new osg::MatrixTransform;
          positioned->setDataVariance(osg::Object::STATIC);
          positioned->setMatrix(osg::Matrix::translate(1.0f, 10.0f, 0.0f)*
                                       osg::Matrix::scale(size,size,size)*
                                       osg::Matrix::rotate(osg::inDegrees(180.0f),0.0f,0.0f,1.0f));
- 
-         positioned->addChild(tempLod.get());
- 
-         std::cout << tempLod.get()->getBound().radius()<< std::endl;
-
+         
          cessnaXform = new osg::MatrixTransform;
          cessnaXform->setUpdateCallback(new osg::AnimationPathCallback(tempAnimationPath,0.0f,2.0));
          cessnaXform->addChild(positioned);
+         positioned->addChild(tempCessnaNode);
+ 
+         //std::cout << tempLod.get()->getBound().radius()<< std::endl;
+
+         
+         
  
   }
 
@@ -182,14 +197,13 @@ osg::ref_ptr<osg::LOD> createLod(osg::ref_ptr<osg::Node> tempCessnaNode) {
 
 int main(int argc, char *argv[]){
   
-  osg::ref_ptr<osg::Group> root = new osg::Group;
+  
 
 #if 1
   osg::ref_ptr<osg::Geode> lineGeode = new osg::Geode();
 
   //Tripwire
-  osg::Vec3 trip_p0 (-150, 15, -2);
-  osg::Vec3 trip_p1 (150, 15, -2);
+  
 
   osg::ref_ptr<osg::Vec3Array> verticesTrip = new osg::Vec3Array();
   verticesTrip->push_back(trip_p0);
@@ -278,7 +292,7 @@ int main(int argc, char *argv[]){
 
   //Creating the animationPath
   osg::Vec3 center(0.0f,0.0f,0.0f);
-  float radius = 10.0f;
+  float radius = 100.0f;
   float animationLength = 10.0f;
   osg::AnimationPath* animationPath = createAnimationPath(center,radius,animationLength);
   
@@ -286,24 +300,24 @@ int main(int argc, char *argv[]){
   osg::Node* dumpTruckNode = osgDB::readNodeFile("dumptruck.osg");
 
   //Creates a level of detail node
-  osg::ref_ptr<osg::LOD> lodNode = createLod(cessnaNode);
+  //osg::ref_ptr<osg::LOD> lodNode = createLod(dumpTruckNode);
 
   //Creates...
-  osg::ref_ptr<osg::MatrixTransform> cessnaXform = createCessnaXform(lodNode, cessnaNode, animationPath, radius);
+  osg::ref_ptr<osg::MatrixTransform> cessnaXform = createCessnaXform(cessnaNode, animationPath, radius);
 
   //Adding intersection functionality
   //osg::ref_ptr<osgUtil::IntersectorGroup> intersectorGroup = new osgUtil::IntersectorGroup();
-  osg::ref_ptr<osgUtil::LineSegmentIntersector> intersector = new osgUtil::LineSegmentIntersector(trip_p0, trip_p1);
+  //osg::ref_ptr<osgUtil::LineSegmentIntersector> intersector = new osgUtil::LineSegmentIntersector(trip_p0, trip_p1);
   //intersectorGroup->addIntersector(intersector.get());
 
-  osgUtil::IntersectionVisitor intersectVisitor( intersector.get());
-
+  //osgUtil::IntersectionVisitor intersectVisitor( intersector.get());
+  
   //intersectVisitor->setUpdateCallback(new IntersectionUpdateCallBack);
-  MyReadCallback* myReadCallback = new MyReadCallback;
 
-  myReadCallback->intersector_ = intersector;
-  myReadCallback->lodNode_ = lodNode;  
-
+  //myReadCallback->intersector_ = intersector;
+  //myReadCallback->dumpTruckXform_ = dumpTruckXform;
+  //myReadCallback->lodNode_ = lodNode;  
+  root->setUpdateCallback(new MyReadCallback);
   //cessnaXform->addChild(intersector);
 
   osg::PositionAttitudeTransform* dumpTruckXform =
@@ -327,8 +341,9 @@ int main(int argc, char *argv[]){
   dumpTruckXform->addChild(dumpTruckNode);
 
 
-  cessnaXform->accept(intersectVisitor);
-  cessnaXform->setUpdateCallback(myReadCallback);
+  //cessnaNode->accept(intersectVisitor);
+  //cessnaNode->setUpdateCallback(myReadCallback);
+  //intersector->setUpdateCallback(myReadCallback);
   // Optimizes the scene-graph
   //osgUtil::Optimizer optimizer;
   //optimizer.optimize(root);
