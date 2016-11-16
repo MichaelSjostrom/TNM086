@@ -25,14 +25,15 @@ osg::ref_ptr<osg::Group> root = new osg::Group;
 osg::Vec3 trip_p0 (-150, 0, -2);
 osg::Vec3 trip_p1 (150, 0, -2);
 
+osg::Light* light1 = new osg::Light;
+bool blue = true;
+
 class MyReadCallback : public osg::NodeCallback {
   
   public:
     virtual void operator()(osg::Node* temp, osg::NodeVisitor* nv) {
 
-      //std::cout << "fuckfuck" << std::endl;
       osg::ref_ptr<osgUtil::LineSegmentIntersector> intersector = new osgUtil::LineSegmentIntersector(trip_p0, trip_p1);
-      //intersectorGroup->addIntersector(intersector.get());
 
       osgUtil::IntersectionVisitor intersectVisitor( intersector.get());
       root->accept(intersectVisitor);
@@ -42,7 +43,15 @@ class MyReadCallback : public osg::NodeCallback {
           std::cout << intersector->getFirstIntersection().getWorldIntersectPoint().y() << std::endl;
           std::cout << intersector->getFirstIntersection().getWorldIntersectPoint().z() << std::endl;
 
-         // std::cout <<"size"  intersector_->getIntersetions().size() << std::endl;
+          if (blue == false){
+            light1->setDiffuse(osg::Vec4(0.0f,0.0f,1.0f,1.0f));
+            blue = true;
+          }
+          else {
+            light1->setDiffuse(osg::Vec4(1.0f,0.0f,0.0f,1.0f));
+            blue = false;
+          }
+
 
       }
       
@@ -50,10 +59,7 @@ class MyReadCallback : public osg::NodeCallback {
         
     }
 
-   
-    //osg::ref_ptr<osgUtil::LineSegmentIntersector> intersector_;
-    //osg::ref_ptr<osg::LOD> lodNode_;
-
+  
 };
 
 
@@ -65,7 +71,7 @@ osg::AnimationPath* createAnimationPath(const osg::Vec3& center,float radius,dou
   int numSamples = 40;
   float yaw = 0.0f;
   float yaw_delta = 2.0f*osg::PI/((float)numSamples-1.0f);
-  float roll = osg::inDegrees(0.0f);
+  float roll = osg::inDegrees(30.0f);
 
   double time=0.0f;
   double time_delta = looptime/(double)numSamples;
@@ -87,7 +93,7 @@ osg::Group* createLights(osg::ref_ptr<osg::Group> root) {
   osg::Group* tempGroup = new osg::Group;
 
   // create a spot light.
-  osg::Light* light1 = new osg::Light;
+  //osg::Light* light1 = new osg::Light;
   light1->setLightNum(0);
   light1->setPosition(osg::Vec4(60.0f,-50.0f,-2.0f,1.0f));
   light1->setAmbient(osg::Vec4(1.0f,1.0f,1.0f,1.0f));
@@ -143,7 +149,7 @@ void createGround(osg::ref_ptr<osg::Geode> tempGeode, int tempSize) {
   tempGeode->getOrCreateStateSet()->setTextureAttributeAndModes(0, groundTexture);
 }
 
-osg::ref_ptr<osg::MatrixTransform> createCessnaXform(osg::ref_ptr<osg::Node> tempCessnaNode, osg::AnimationPath* tempAnimationPath, float radius) {
+osg::ref_ptr<osg::MatrixTransform> createCessnaXform(osg::ref_ptr<osg::LOD> lodNode, osg::ref_ptr<osg::Node> tempCessnaNode, osg::AnimationPath* tempAnimationPath, float radius) {
   
   //Create simplified versions of cessna
   osg::ref_ptr<osg::MatrixTransform> cessnaXform;
@@ -161,12 +167,7 @@ osg::ref_ptr<osg::MatrixTransform> createCessnaXform(osg::ref_ptr<osg::Node> tem
          cessnaXform = new osg::MatrixTransform;
          cessnaXform->setUpdateCallback(new osg::AnimationPathCallback(tempAnimationPath,0.0f,2.0));
          cessnaXform->addChild(positioned);
-         positioned->addChild(tempCessnaNode);
- 
-         //std::cout << tempLod.get()->getBound().radius()<< std::endl;
-
-         
-         
+         positioned->addChild(lodNode.get());
  
   }
 
@@ -201,6 +202,7 @@ int main(int argc, char *argv[]){
 
 #if 1
   osg::ref_ptr<osg::Geode> lineGeode = new osg::Geode();
+
 
   //Tripwire
   
@@ -287,8 +289,9 @@ int main(int argc, char *argv[]){
 
   //Creates the lights
   osg::Group* lightGroup = createLights(root);
+  osg::ref_ptr<osg::Geode> groundGeode = new osg::Geode();
 
-  createGround(lineGeode, groundSize);
+  createGround(groundGeode, groundSize);
 
   //Creating the animationPath
   osg::Vec3 center(0.0f,0.0f,0.0f);
@@ -300,25 +303,13 @@ int main(int argc, char *argv[]){
   osg::Node* dumpTruckNode = osgDB::readNodeFile("dumptruck.osg");
 
   //Creates a level of detail node
-  //osg::ref_ptr<osg::LOD> lodNode = createLod(dumpTruckNode);
+  osg::ref_ptr<osg::LOD> lodNode = createLod(cessnaNode);
 
   //Creates...
-  osg::ref_ptr<osg::MatrixTransform> cessnaXform = createCessnaXform(cessnaNode, animationPath, radius);
+  osg::ref_ptr<osg::MatrixTransform> cessnaXform = createCessnaXform(lodNode ,cessnaNode, animationPath, radius);
 
-  //Adding intersection functionality
-  //osg::ref_ptr<osgUtil::IntersectorGroup> intersectorGroup = new osgUtil::IntersectorGroup();
-  //osg::ref_ptr<osgUtil::LineSegmentIntersector> intersector = new osgUtil::LineSegmentIntersector(trip_p0, trip_p1);
-  //intersectorGroup->addIntersector(intersector.get());
 
-  //osgUtil::IntersectionVisitor intersectVisitor( intersector.get());
-  
-  //intersectVisitor->setUpdateCallback(new IntersectionUpdateCallBack);
-
-  //myReadCallback->intersector_ = intersector;
-  //myReadCallback->dumpTruckXform_ = dumpTruckXform;
-  //myReadCallback->lodNode_ = lodNode;  
   root->setUpdateCallback(new MyReadCallback);
-  //cessnaXform->addChild(intersector);
 
   osg::PositionAttitudeTransform* dumpTruckXform =
    new osg::PositionAttitudeTransform();
@@ -332,18 +323,13 @@ int main(int argc, char *argv[]){
   dumpTruckXform->setPosition(dumpTruckPos);
 
   root->addChild(lineGeode);
+  root->addChild(groundGeode);
   root->addChild(cessnaXform);
   root->addChild(dumpTruckXform);
   root->addChild(lightGroup);
-  //lineGeode->getOrCreateStateSet()->setTextureAttributeAndModes(0, groundTexture);
-
   
   dumpTruckXform->addChild(dumpTruckNode);
 
-
-  //cessnaNode->accept(intersectVisitor);
-  //cessnaNode->setUpdateCallback(myReadCallback);
-  //intersector->setUpdateCallback(myReadCallback);
   // Optimizes the scene-graph
   //osgUtil::Optimizer optimizer;
   //optimizer.optimize(root);
